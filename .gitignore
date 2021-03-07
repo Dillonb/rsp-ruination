@@ -1,0 +1,8 @@
+*.bin
+.idea
+*.o
+*.elf
+*.z64
+cmake-build-debug
+cmake-build-release
+build
