@@ -272,10 +272,20 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
             }
 
             if (testcase_emulated.flag_elements[e].vcc != dmem_results->flag_elements[e].vcc) {
-                hang("Broke! vcc\n");
+                printf("Input (broadcast modifier %d):\n", e);
+                print_v128_ln(&dmem_results->arg1);
+                print_v128_ln(&dmem_results->arg2);
+                printf("VCC soft RSP\n%04X\n", testcase_emulated.flag_elements[e].vcc);
+                printf("VCC real RSP\n%04X\n", dmem_results->flag_elements[e].vcc);
+                hang("Mismatch!");
             }
             if (testcase_emulated.flag_elements[e].vce != dmem_results->flag_elements[e].vce) {
-                hang("Broke! vce\n");
+                printf("Input (broadcast modifier %d):\n", e);
+                print_v128_ln(&dmem_results->arg1);
+                print_v128_ln(&dmem_results->arg2);
+                printf("VCE soft RSP\n%04X\n", testcase_emulated.flag_elements[e].vce);
+                printf("VCE real RSP\n%04X\n", dmem_results->flag_elements[e].vce);
+                hang("Mismatch!");
             }
             if (testcase_emulated.flag_elements[e].vco != dmem_results->flag_elements[e].vco) {
                 printf("Input (broadcast modifier %d):\n", e);
