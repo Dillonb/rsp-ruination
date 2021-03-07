@@ -184,6 +184,28 @@ half next_half() {
 
 #define hang(message,...) do { printf(message, ##__VA_ARGS__); while(1) { console_render(); } } while(0)
 
+void dump_rsp(int e) {
+    printf("Input (broadcast modifier %d):\n", e);
+    print_v128_ln(&dmem_results->arg1);
+    print_v128_ln(&dmem_results->arg2);
+
+    printf("\nSoft RSP vd/acch/accm/accl\n");
+    print_v128_ln(&testcase_emulated.result_elements[e].res);
+
+    print_v128_ln(&testcase_emulated.result_elements[e].acch);
+    print_v128_ln(&testcase_emulated.result_elements[e].accm);
+    print_v128_ln(&testcase_emulated.result_elements[e].accl);
+
+    printf("\nVCO 0x%04X VCC 0x%04X VCE 0x%02X\n", testcase_emulated.flag_elements[e].vco, testcase_emulated.flag_elements[e].vcc, testcase_emulated.flag_elements[e].vce);
+
+    printf("\nReal RSP vd/acch/accm/accl\n");
+    print_v128_ln(&dmem_results->result_elements[e].res);
+    print_v128_ln(&dmem_results->result_elements[e].acch);
+    print_v128_ln(&dmem_results->result_elements[e].accm);
+    print_v128_ln(&dmem_results->result_elements[e].accl);
+    printf("VCO 0x%04X VCC 0x%04X VCE 0x%02X\n\n", dmem_results->flag_elements[e].vco, dmem_results->flag_elements[e].vcc, dmem_results->flag_elements[e].vce);
+}
+
 void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction_t instruction) {
 #define testcase (*dmem_results)
 
@@ -223,12 +245,6 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
     rsp_execution_complete = false;
     run_ucode();
 
-    /*
-    print_v128_ln(&dmem_results->arg1);
-    print_v128_ln(&dmem_results->arg2);
-    print_v128_ln(&dmem_results->result_elements[0].res);
-     */
-
     for (int e = 0; e < 16; e++) {
         instruction.cp2_vec.e = e;
         testable_instruction->handler(instruction);
@@ -249,51 +265,37 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
         console_render();
     }
 
+
     for (int e = 0; e < 16; e++) {
         for (int i = 0; i < 8; i++) {
             if (testcase_emulated.result_elements[e].res.elements[i] != dmem_results->result_elements[e].res.elements[i]) {
-                printf("Input (broadcast modifier %d):\n", e);
-                print_v128_ln(&dmem_results->arg1);
-                print_v128_ln(&dmem_results->arg2);
-                printf("Vd soft RSP\n");
-                print_v128_ln(&testcase_emulated.result_elements[e].res);
-                printf("Vd real RSP\n");
-                print_v128_ln(&dmem_results->result_elements[e].res);
-                hang("Mismatch!");
+                dump_rsp(e);
+                hang("vd Mismatch!");
             }
             if (testcase_emulated.result_elements[e].accl.elements[i] != dmem_results->result_elements[e].accl.elements[i]) {
-                hang("Broke! accl\n");
+                dump_rsp(e);
+                hang("accl mismatch!\n");
             }
             if (testcase_emulated.result_elements[e].accm.elements[i] != dmem_results->result_elements[e].accm.elements[i]) {
-                hang("Broke! accm\n");
+                dump_rsp(e);
+                hang("accm mismatch!\n");
             }
             if (testcase_emulated.result_elements[e].acch.elements[i] != dmem_results->result_elements[e].acch.elements[i]) {
-                hang("Broke! acch\n");
+                dump_rsp(e);
+                hang("acch mismatch!\n");
             }
 
             if (testcase_emulated.flag_elements[e].vcc != dmem_results->flag_elements[e].vcc) {
-                printf("Input (broadcast modifier %d):\n", e);
-                print_v128_ln(&dmem_results->arg1);
-                print_v128_ln(&dmem_results->arg2);
-                printf("VCC soft RSP\n%04X\n", testcase_emulated.flag_elements[e].vcc);
-                printf("VCC real RSP\n%04X\n", dmem_results->flag_elements[e].vcc);
-                hang("Mismatch!");
+                dump_rsp(e);
+                hang("vcc mismatch!");
             }
             if (testcase_emulated.flag_elements[e].vce != dmem_results->flag_elements[e].vce) {
-                printf("Input (broadcast modifier %d):\n", e);
-                print_v128_ln(&dmem_results->arg1);
-                print_v128_ln(&dmem_results->arg2);
-                printf("VCE soft RSP\n%04X\n", testcase_emulated.flag_elements[e].vce);
-                printf("VCE real RSP\n%04X\n", dmem_results->flag_elements[e].vce);
-                hang("Mismatch!");
+                dump_rsp(e);
+                hang("vce mismatch!");
             }
             if (testcase_emulated.flag_elements[e].vco != dmem_results->flag_elements[e].vco) {
-                printf("Input (broadcast modifier %d):\n", e);
-                print_v128_ln(&dmem_results->arg1);
-                print_v128_ln(&dmem_results->arg2);
-                printf("VCO soft RSP\n%04X\n", testcase_emulated.flag_elements[e].vco);
-                printf("VCO real RSP\n%04X\n", dmem_results->flag_elements[e].vco);
-                hang("Mismatch!");
+                dump_rsp(e);
+                hang("vco Mismatch!");
             }
         }
     }
