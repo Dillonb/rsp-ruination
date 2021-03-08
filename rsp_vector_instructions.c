@@ -712,7 +712,7 @@ RSP_VECTOR_INSTR(rsp_vec_vcr) {
         half vt_abs = sign_different ? ~vte_element : vte_element;
 
         // Compare using one's complement
-        bool gte = vte_element <= (sign_different ? 0xFFFF : vs_element);
+        bool gte = (shalf)vte_element <= (shalf)(sign_different ? 0xFFFF : vs_element);
         bool lte = (((sign_different ? vs_element : 0) + vte_element) & 0x8000) == 0x8000;
 
         // If the sign is different, check LTE, otherwise, check GTE.
