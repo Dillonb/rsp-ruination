@@ -10,8 +10,7 @@
 #include "rsp_funct.h"
 #include "rsp_state.h"
 #include "mips_instruction_decode.h"
-
-#define FUZZES_PER_INSTRUCTION 1000
+#include "testcases.h"
 
 extern const void __basic_ucode_data_start;
 extern const void __basic_ucode_start;
@@ -206,6 +205,26 @@ void dump_rsp(int e) {
     printf("VCO 0x%04X VCC 0x%04X VCE 0x%02X\n\n", dmem_results->flag_elements[e].vco, dmem_results->flag_elements[e].vcc, dmem_results->flag_elements[e].vce);
 }
 
+
+int arg1_index = 0;
+int arg2_index = 0;
+void testcases_reset() {
+    arg1_index = 0;
+    arg2_index = 0;
+}
+
+void next_testcase(volatile half* a1, volatile half* a2) {
+    *a1 = testcase_numbers[arg1_index];
+    *a1 = testcase_numbers[arg2_index];
+
+    if (++arg1_index == NUM_TESTCASE_NUMBERS) {
+        arg1_index = 0;
+        if (++arg2_index == NUM_TESTCASE_NUMBERS) {
+            arg2_index = 0;
+        }
+    }
+}
+
 void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction_t instruction) {
 #define testcase (*dmem_results)
 
@@ -219,23 +238,9 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
         dmem_results->flag_elements[e].packed = 0;
     }
 
-    testcase.arg1.elements[0] = next_half();
-    testcase.arg1.elements[1] = next_half();
-    testcase.arg1.elements[2] = next_half();
-    testcase.arg1.elements[3] = next_half();
-    testcase.arg1.elements[4] = next_half();
-    testcase.arg1.elements[5] = next_half();
-    testcase.arg1.elements[6] = next_half();
-    testcase.arg1.elements[7] = next_half();
-
-    testcase.arg2.elements[0] = next_half();
-    testcase.arg2.elements[1] = next_half();
-    testcase.arg2.elements[2] = next_half();
-    testcase.arg2.elements[3] = next_half();
-    testcase.arg2.elements[4] = next_half();
-    testcase.arg2.elements[5] = next_half();
-    testcase.arg2.elements[6] = next_half();
-    testcase.arg2.elements[7] = next_half();
+    for (int i = 0; i < 8; i++) {
+        next_testcase(&testcase.arg1.elements[i], &testcase.arg2.elements[i]);
+    }
 
     for (int i = 0; i < 8; i++) {
         N64RSP.vu_regs[vs].elements[i] = testcase.arg1.elements[i];
@@ -373,8 +378,14 @@ int main(void) {
                 old_instruction = instruction.raw;
             }
 
+            testcases_reset();
             for (int test = 0; test < FUZZES_PER_INSTRUCTION; test++) {
                 run_test(&instrs[instr], instruction);
+                if ((test & 0x3FFF) == 0) {
+                    int remaining = FUZZES_PER_INSTRUCTION - test;
+                    printf("%d done, %d remaining\n", test, remaining);
+                    console_render();
+                }
             }
         }
         console_render();

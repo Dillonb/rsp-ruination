@@ -38,6 +38,7 @@ add_executable(code.elf
         rsp_funct.h
         rsp_rom.h
         rsp_state.c rsp_state.h
+        testcases.h
         loader.s)
 target_compile_options(code.elf PUBLIC -Wall -Werror -O2)
 target_link_libraries(code.elf PUBLIC dragon c m dragonsys)
