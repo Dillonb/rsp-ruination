@@ -66,7 +66,7 @@ typedef struct testcase {
     flag_result_t flag_elements[16];
 }  testcase_t;
 
-volatile testcase_t* dmem_results = (testcase_t*)(0xA4000000);
+testcase_t* dmem_results;
 testcase_t testcase_emulated;
 
 _Static_assert(sizeof(testcase_t) ==
@@ -95,7 +95,7 @@ void load_replacement_ucode(word instruction, int* replacement_indices, unsigned
     word* uncached_ucode = UncachedAddr(ucode);
     memcpy(uncached_ucode, &__basic_ucode_start, ucode_size);
     for (int i = 0; i < 16; i++) {
-        uncached_ucode[replacement_indices[i]] = element_instruction(instruction, i);
+        uncached_ucode[replacement_indices[i]] = instruction == 0x00000000 ? instruction : element_instruction(instruction, i);
     }
     load_ucode(uncached_ucode, ucode_size);
     for (int i = 0; i < 0x1000; i++) {
@@ -207,8 +207,6 @@ void dump_rsp(int e) {
 }
 
 void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction_t instruction) {
-#define testcase (*dmem_results)
-
     for (int e = 0; e < 16; e++) {
         for (int i = 0; i < 4; i++) {
             dmem_results->result_elements[e].res.words[i] = 0;
@@ -219,29 +217,30 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
         dmem_results->flag_elements[e].packed = 0;
     }
 
-    testcase.arg1.elements[0] = next_half();
-    testcase.arg1.elements[1] = next_half();
-    testcase.arg1.elements[2] = next_half();
-    testcase.arg1.elements[3] = next_half();
-    testcase.arg1.elements[4] = next_half();
-    testcase.arg1.elements[5] = next_half();
-    testcase.arg1.elements[6] = next_half();
-    testcase.arg1.elements[7] = next_half();
+    dmem_results->arg1.elements[0] = next_half();
+    dmem_results->arg1.elements[1] = next_half();
+    dmem_results->arg1.elements[2] = next_half();
+    dmem_results->arg1.elements[3] = next_half();
+    dmem_results->arg1.elements[4] = next_half();
+    dmem_results->arg1.elements[5] = next_half();
+    dmem_results->arg1.elements[6] = next_half();
+    dmem_results->arg1.elements[7] = next_half();
 
-    testcase.arg2.elements[0] = next_half();
-    testcase.arg2.elements[1] = next_half();
-    testcase.arg2.elements[2] = next_half();
-    testcase.arg2.elements[3] = next_half();
-    testcase.arg2.elements[4] = next_half();
-    testcase.arg2.elements[5] = next_half();
-    testcase.arg2.elements[6] = next_half();
-    testcase.arg2.elements[7] = next_half();
+    dmem_results->arg2.elements[0] = next_half();
+    dmem_results->arg2.elements[1] = next_half();
+    dmem_results->arg2.elements[2] = next_half();
+    dmem_results->arg2.elements[3] = next_half();
+    dmem_results->arg2.elements[4] = next_half();
+    dmem_results->arg2.elements[5] = next_half();
+    dmem_results->arg2.elements[6] = next_half();
+    dmem_results->arg2.elements[7] = next_half();
 
     for (int i = 0; i < 8; i++) {
-        N64RSP.vu_regs[vs].elements[i] = testcase.arg1.elements[i];
-        N64RSP.vu_regs[vt].elements[i] = testcase.arg2.elements[i];
+        N64RSP.vu_regs[vs].elements[i] = dmem_results->arg1.elements[i];
+        N64RSP.vu_regs[vt].elements[i] = dmem_results->arg2.elements[i];
     }
 
+    load_data(dmem_results, sizeof(testcase_t));
     rsp_execution_complete = false;
     run_ucode();
 
@@ -264,6 +263,8 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
         printf("Waiting on the RSP, if you're seeing this you probably have timing issues\n");
         console_render();
     }
+
+    read_data(dmem_results, sizeof(testcase_t));
 
 
     for (int e = 0; e < 16; e++) {
@@ -302,6 +303,7 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
 }
 
 int main(void) {
+    dmem_results = UncachedAddr(malloc(sizeof(testcase_t)));
     /* enable interrupts (on the CPU) */
     init_interrupts();
 
@@ -344,12 +346,15 @@ int main(void) {
 
     // Get initial state by "testing" with NOPs
     load_replacement_ucode(0x00000000, replacement_indices, ucode_size);
+    memset(dmem_results, 0x00, sizeof(testcase_t));
+    load_data(dmem_results, sizeof(testcase_t));
     rsp_execution_complete = false;
     run_ucode();
     while (!rsp_execution_complete) {
         printf("Grabbing initial state from RSP...\n");
         console_render();
     }
+    read_data(dmem_results, sizeof(testcase_t));
     rsp_set_vcc(dmem_results->flag_elements[0].vcc);
     rsp_set_vce(dmem_results->flag_elements[0].vce);
     rsp_set_vco(dmem_results->flag_elements[0].vco);
