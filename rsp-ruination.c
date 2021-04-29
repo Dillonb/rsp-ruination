@@ -67,7 +67,7 @@ typedef struct testcase {
 }  testcase_t;
 
 testcase_t* dmem_results;
-testcase_t testcase_emulated;
+testcase_t* testcase_emulated;
 
 _Static_assert(sizeof(testcase_t) ==
                        (16 * 3) +      // zero, arg1, arg2
@@ -190,13 +190,13 @@ void dump_rsp(int e) {
     print_v128_ln(&dmem_results->arg2);
 
     printf("\nSoft RSP vd/acch/accm/accl\n");
-    print_v128_ln(&testcase_emulated.result_elements[e].res);
+    print_v128_ln(&testcase_emulated->result_elements[e].res);
 
-    print_v128_ln(&testcase_emulated.result_elements[e].acch);
-    print_v128_ln(&testcase_emulated.result_elements[e].accm);
-    print_v128_ln(&testcase_emulated.result_elements[e].accl);
+    print_v128_ln(&testcase_emulated->result_elements[e].acch);
+    print_v128_ln(&testcase_emulated->result_elements[e].accm);
+    print_v128_ln(&testcase_emulated->result_elements[e].accl);
 
-    printf("\nVCO 0x%04X VCC 0x%04X VCE 0x%02X\n", testcase_emulated.flag_elements[e].vco, testcase_emulated.flag_elements[e].vcc, testcase_emulated.flag_elements[e].vce);
+    printf("\nVCO 0x%04X VCC 0x%04X VCE 0x%02X\n", testcase_emulated->flag_elements[e].vco, testcase_emulated->flag_elements[e].vcc, testcase_emulated->flag_elements[e].vce);
 
     printf("\nReal RSP vd/acch/accm/accl\n");
     print_v128_ln(&dmem_results->result_elements[e].res);
@@ -248,14 +248,14 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
         instruction.cp2_vec.e = e;
         testable_instruction->handler(instruction);
         for (int i = 0; i < 8; i++) {
-            testcase_emulated.result_elements[e].res.elements[i] = N64RSP.vu_regs[vd].elements[i];
-            testcase_emulated.result_elements[e].accl.elements[i] = N64RSP.acc.l.elements[i];
-            testcase_emulated.result_elements[e].accm.elements[i] = N64RSP.acc.m.elements[i];
-            testcase_emulated.result_elements[e].acch.elements[i] = N64RSP.acc.h.elements[i];
+            testcase_emulated->result_elements[e].res.elements[i] = N64RSP.vu_regs[vd].elements[i];
+            testcase_emulated->result_elements[e].accl.elements[i] = N64RSP.acc.l.elements[i];
+            testcase_emulated->result_elements[e].accm.elements[i] = N64RSP.acc.m.elements[i];
+            testcase_emulated->result_elements[e].acch.elements[i] = N64RSP.acc.h.elements[i];
 
-            testcase_emulated.flag_elements[e].vcc = rsp_get_vcc();
-            testcase_emulated.flag_elements[e].vce = rsp_get_vce();
-            testcase_emulated.flag_elements[e].vco = rsp_get_vco();
+            testcase_emulated->flag_elements[e].vcc = rsp_get_vcc();
+            testcase_emulated->flag_elements[e].vce = rsp_get_vce();
+            testcase_emulated->flag_elements[e].vco = rsp_get_vco();
         }
     }
 
@@ -269,32 +269,32 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
 
     for (int e = 0; e < 16; e++) {
         for (int i = 0; i < 8; i++) {
-            if (testcase_emulated.result_elements[e].res.elements[i] != dmem_results->result_elements[e].res.elements[i]) {
+            if (testcase_emulated->result_elements[e].res.elements[i] != dmem_results->result_elements[e].res.elements[i]) {
                 dump_rsp(e);
                 hang("vd Mismatch!");
             }
-            if (testcase_emulated.result_elements[e].accl.elements[i] != dmem_results->result_elements[e].accl.elements[i]) {
+            if (testcase_emulated->result_elements[e].accl.elements[i] != dmem_results->result_elements[e].accl.elements[i]) {
                 dump_rsp(e);
                 hang("accl mismatch!\n");
             }
-            if (testcase_emulated.result_elements[e].accm.elements[i] != dmem_results->result_elements[e].accm.elements[i]) {
+            if (testcase_emulated->result_elements[e].accm.elements[i] != dmem_results->result_elements[e].accm.elements[i]) {
                 dump_rsp(e);
                 hang("accm mismatch!\n");
             }
-            if (testcase_emulated.result_elements[e].acch.elements[i] != dmem_results->result_elements[e].acch.elements[i]) {
+            if (testcase_emulated->result_elements[e].acch.elements[i] != dmem_results->result_elements[e].acch.elements[i]) {
                 dump_rsp(e);
                 hang("acch mismatch!\n");
             }
 
-            if (testcase_emulated.flag_elements[e].vcc != dmem_results->flag_elements[e].vcc) {
+            if (testcase_emulated->flag_elements[e].vcc != dmem_results->flag_elements[e].vcc) {
                 dump_rsp(e);
                 hang("vcc mismatch!");
             }
-            if (testcase_emulated.flag_elements[e].vce != dmem_results->flag_elements[e].vce) {
+            if (testcase_emulated->flag_elements[e].vce != dmem_results->flag_elements[e].vce) {
                 dump_rsp(e);
                 hang("vce mismatch!");
             }
-            if (testcase_emulated.flag_elements[e].vco != dmem_results->flag_elements[e].vco) {
+            if (testcase_emulated->flag_elements[e].vco != dmem_results->flag_elements[e].vco) {
                 dump_rsp(e);
                 hang("vco Mismatch!");
             }
@@ -304,6 +304,7 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
 
 int main(void) {
     dmem_results = UncachedAddr(malloc(sizeof(testcase_t)));
+    testcase_emulated = UncachedAddr(malloc(sizeof(testcase_t)));
     /* enable interrupts (on the CPU) */
     init_interrupts();
 
