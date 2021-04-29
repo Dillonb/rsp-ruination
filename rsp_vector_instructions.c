@@ -1,16 +1,8 @@
 #include "rsp_vector_instructions.h"
 
-#ifdef N64_USE_SIMD
-#include <emmintrin.h>
-#endif
 
 #include <log.h>
 #include <stdlib.h>
-#ifdef N64_USE_SIMD
-#include <immintrin.h>
-#include <n64_rsp_bus.h>
-
-#endif
 #include "rsp.h"
 #include "rsp_rom.h"
 #include "n64_rsp_bus.h"
@@ -41,10 +33,6 @@ INLINE bool is_sign_extension(shalf high, shalf low) {
     return false;
 }
 
-INLINE shalf to_twosc(half onesc) {
-    return onesc + (onesc >> 15);
-}
-
 INLINE int CLZ(word value) {
     int leading_zeroes = 0;
     for (int i = 0; i < 32 && (value & 0x80000000) == 0; i++) {
@@ -54,7 +42,6 @@ INLINE int CLZ(word value) {
     return leading_zeroes;
 }
 
-#ifndef N64_USE_SIMD
 INLINE vu_reg_t broadcast(vu_reg_t* vt, int lane0, int lane1, int lane2, int lane3, int lane4, int lane5, int lane6, int lane7) {
     vu_reg_t vte;
     vte.elements[VU_ELEM_INDEX(0)] = vt->elements[VU_ELEM_INDEX(lane0)];
@@ -67,7 +54,6 @@ INLINE vu_reg_t broadcast(vu_reg_t* vt, int lane0, int lane1, int lane2, int lan
     vte.elements[VU_ELEM_INDEX(7)] = vt->elements[VU_ELEM_INDEX(lane7)];
     return vte;
 }
-#endif
 
 INLINE vu_reg_t get_vte(vu_reg_t* vt, byte e) {
     vu_reg_t vte;
@@ -75,57 +61,29 @@ INLINE vu_reg_t get_vte(vu_reg_t* vt, byte e) {
         case 0 ... 1:
             return *vt;
         case 2:
-#ifdef N64_USE_SIMD
-            vte.single = _mm_shufflehi_epi16(_mm_shufflelo_epi16(vt->single, 0b11110101), 0b11110101);
-#else
             vte = broadcast(vt, 0, 0, 2, 2, 4, 4, 6, 6);
-#endif
             break;
         case 3:
-#ifdef N64_USE_SIMD
-            vte.single = _mm_shufflehi_epi16(_mm_shufflelo_epi16(vt->single, 0b10100000), 0b10100000);
-#else
             vte = broadcast(vt, 1, 1, 3, 3, 5, 5, 7, 7);
-#endif
             break;
         case 4:
-#ifdef N64_USE_SIMD
-            vte.single = _mm_shufflehi_epi16(_mm_shufflelo_epi16(vt->single, 0b11111111), 0b11111111);
-#else
             vte = broadcast(vt, 0, 0, 0, 0, 4, 4, 4, 4);
-#endif
             break;
         case 5:
-#ifdef N64_USE_SIMD
-            vte.single = _mm_shufflehi_epi16(_mm_shufflelo_epi16(vt->single, 0b10101010), 0b10101010);
-#else
             vte = broadcast(vt, 1, 1, 1, 1, 5, 5, 5, 5);
-#endif
             break;
         case 6:
-#ifdef N64_USE_SIMD
-            vte.single = _mm_shufflehi_epi16(_mm_shufflelo_epi16(vt->single, 0b01010101), 0b01010101);
-#else
             vte = broadcast(vt, 2, 2, 2, 2, 6, 6, 6, 6);
-#endif
             break;
         case 7:
-#ifdef N64_USE_SIMD
-            vte.single = _mm_shufflehi_epi16(_mm_shufflelo_epi16(vt->single, 0b00000000), 0b00000000);
-#else
             vte = broadcast(vt, 3, 3, 3, 3, 7, 7, 7, 7);
-#endif
             break;
         case 8 ... 15: {
             int index = VU_ELEM_INDEX(e - 8);
-#ifdef N64_USE_SIMD
-            vte.single = _mm_set1_epi16(vt->elements[index]);
-#else
             for (int i = 0; i < 8; i++) {
                 half val = vt->elements[index];
                 vte.elements[i] = val;
             }
-#endif
             break;
         }
         default:
@@ -606,27 +564,6 @@ RSP_VECTOR_INSTR(rsp_vec_vabs) {
     defvd;
     defvte;
 
-#ifdef N64_USE_SIMD
-    // check if each element is zero
-    __m128i vs_is_zero = _mm_cmpeq_epi16(vs->single, N64RSP.zero);
-
-    // arithmetic shift right by 15 (effectively sets each bit of the number to the sign bit)
-    __m128i vs_is_negative = _mm_srai_epi16(vs->single, 15);
-    // (!vs_is_zero) & vte
-    // for each vte element, outputs zero if the corresponding vs element is zero, or else outputs the regular vte element.
-    __m128i temp = _mm_andnot_si128(vs_is_zero, vte.single);
-
-    // xor each element of the temp var with whether the vs element is negative
-    // If the vs element is negative, flip all the bits. Otherwise, do nothing.
-    temp = _mm_xor_si128(temp, vs_is_negative);
-    // acc.l = temp[element] - (is_negative[element] ? 0xFFFF : 0)
-    N64RSP.acc.l.single = _mm_sub_epi16(temp, vs_is_negative);
-
-    // only difference here is that this a _signed_ subtraction
-    // handle the special case where vte.elements[i] == 0x8000
-    // acc.l = temp[element] - (is_negative[element] ? -1 : 0)
-    vd->single = _mm_subs_epi16(temp, vs_is_negative);
-#else
     for (int i = 0; i < 8; i++) {
         if (vs->signed_elements[i] < 0) {
             if (unlikely(vte.elements[i] == 0x8000)) {
@@ -644,7 +581,6 @@ RSP_VECTOR_INSTR(rsp_vec_vabs) {
             N64RSP.acc.l.elements[i] = vte.elements[i];
         }
     }
-#endif
 }
 
 RSP_VECTOR_INSTR(rsp_vec_vadd) {
@@ -776,7 +712,7 @@ RSP_VECTOR_INSTR(rsp_vec_vcr) {
         half vt_abs = sign_different ? ~vte_element : vte_element;
 
         // Compare using one's complement
-        bool gte = to_twosc(vs_element) >= to_twosc(vte_element);
+        bool gte = (shalf)vte_element <= (shalf)(sign_different ? 0xFFFF : vs_element);
         bool lte = (((sign_different ? vs_element : 0) + vte_element) & 0x8000) == 0x8000;
 
         // If the sign is different, check LTE, otherwise, check GTE.
@@ -864,10 +800,11 @@ RSP_VECTOR_INSTR(rsp_vec_vmacf) {
         sdword acc_delta = prod;
         acc_delta *= 2;
         sdword acc = get_rsp_accumulator(e) + acc_delta;
+        set_rsp_accumulator(e, acc);
+        acc = get_rsp_accumulator(e);
 
         shalf result = clamp_signed(acc >> 16);
 
-        set_rsp_accumulator(e, acc);
         vd->elements[e] = result;
     }
 }
@@ -891,10 +828,11 @@ RSP_VECTOR_INSTR(rsp_vec_vmacu) {
         sdword acc_delta = prod;
         acc_delta *= 2;
         sdword acc = get_rsp_accumulator(e) + acc_delta;
+        set_rsp_accumulator(e, acc);
+        acc = get_rsp_accumulator(e);
 
         half result = clamp_unsigned(acc >> 16);
 
-        set_rsp_accumulator(e, acc);
         vd->elements[e] = result;
     }
 }
@@ -904,20 +842,6 @@ RSP_VECTOR_INSTR(rsp_vec_vmadh) {
     defvs;
     defvd;
     defvte;
-#ifdef N64_USE_SIMD
-    vecr lo, hi, omask;
-    lo                 = _mm_mullo_epi16(vs->single, vte.single);
-    hi                 = _mm_mulhi_epi16(vs->single, vte.single);
-    omask              = _mm_adds_epu16(N64RSP.acc.m.single, lo);
-    N64RSP.acc.m.single  = _mm_add_epi16(N64RSP.acc.m.single, lo);
-    omask              = _mm_cmpeq_epi16(N64RSP.acc.m.single, omask);
-    omask              = _mm_cmpeq_epi16(omask, N64RSP.zero);
-    hi                 = _mm_sub_epi16(hi, omask);
-    N64RSP.acc.h.single  = _mm_add_epi16(N64RSP.acc.h.single, hi);
-    lo                 = _mm_unpacklo_epi16(N64RSP.acc.m.single, N64RSP.acc.h.single);
-    hi                 = _mm_unpackhi_epi16(N64RSP.acc.m.single, N64RSP.acc.h.single);
-    vd->single         = _mm_packs_epi32(lo, hi);
-#else
     for (int e = 0; e < 8; e++) {
         shalf multiplicand1 = vte.elements[e];
         shalf multiplicand2 = vs->elements[e];
@@ -926,13 +850,13 @@ RSP_VECTOR_INSTR(rsp_vec_vmadh) {
 
         dword acc_delta = (dword)uprod << 16;
         sdword acc = get_rsp_accumulator(e) + acc_delta;
-
-        shalf result = clamp_signed((sword)(acc >> 16));
-
         set_rsp_accumulator(e, acc);
+        acc = get_rsp_accumulator(e);
+
+        shalf result = clamp_signed(acc >> 16);
+
         vd->elements[e] = result;
     }
-#endif
 }
 
 RSP_VECTOR_INSTR(rsp_vec_vmadl) {
@@ -967,29 +891,6 @@ RSP_VECTOR_INSTR(rsp_vec_vmadm) {
     defvs;
     defvd;
     defvte;
-#ifdef N64_USE_SIMD
-    vecr lo, hi, sign, vta, omask;
-    lo                 = _mm_mullo_epi16(vs->single, vte.single);
-    hi                 = _mm_mulhi_epu16(vs->single, vte.single);
-    sign               = _mm_srai_epi16(vs->single, 15);
-    vta                = _mm_and_si128(vte.single, sign);
-    hi                 = _mm_sub_epi16(hi, vta);
-    omask              = _mm_adds_epu16(N64RSP.acc.l.single, lo);
-    N64RSP.acc.l.single  = _mm_add_epi16(N64RSP.acc.l.single, lo);
-    omask              = _mm_cmpeq_epi16(N64RSP.acc.l.single, omask);
-    omask              = _mm_cmpeq_epi16(omask, N64RSP.zero);
-    hi                 = _mm_sub_epi16(hi, omask);
-    omask              = _mm_adds_epu16(N64RSP.acc.m.single, hi);
-    N64RSP.acc.m.single  = _mm_add_epi16(N64RSP.acc.m.single, hi);
-    omask              = _mm_cmpeq_epi16(N64RSP.acc.m.single, omask);
-    omask              = _mm_cmpeq_epi16(omask, N64RSP.zero);
-    hi                 = _mm_srai_epi16(hi, 15);
-    N64RSP.acc.h.single  = _mm_add_epi16(N64RSP.acc.h.single, hi);
-    N64RSP.acc.h.single  = _mm_sub_epi16(N64RSP.acc.h.single, omask);
-    lo                 = _mm_unpacklo_epi16(N64RSP.acc.m.single, N64RSP.acc.h.single);
-    hi                 = _mm_unpackhi_epi16(N64RSP.acc.m.single, N64RSP.acc.h.single);
-    vd->single         = _mm_packs_epi32(lo, hi);
-#else
     for (int e = 0; e < 8; e++) {
         half multiplicand1 = vte.elements[e];
         shalf multiplicand2 = vs->elements[e];
@@ -998,13 +899,13 @@ RSP_VECTOR_INSTR(rsp_vec_vmadm) {
         sdword acc_delta = prod;
         sdword acc = get_rsp_accumulator(e);
         acc += acc_delta;
+        set_rsp_accumulator(e, acc);
+        acc = get_rsp_accumulator(e);
 
         shalf result = clamp_signed(acc >> 16);
 
-        set_rsp_accumulator(e, acc);
         vd->elements[e] = result;
     }
-#endif
 }
 
 RSP_VECTOR_INSTR(rsp_vec_vmadn) {
@@ -1012,33 +913,6 @@ RSP_VECTOR_INSTR(rsp_vec_vmadn) {
     defvs;
     defvd;
     defvte;
-#ifdef N64_USE_SIMD
-    vecr lo, hi, sign, vsa, omask, nhi, nmd, shi, smd, cmask, cval;
-    lo                 = _mm_mullo_epi16(vs->single, vte.single);
-    hi                 = _mm_mulhi_epu16(vs->single, vte.single);
-    sign               = _mm_srai_epi16(vte.single, 15);
-    vsa                = _mm_and_si128(vs->single, sign);
-    hi                 = _mm_sub_epi16(hi, vsa);
-    omask              = _mm_adds_epu16(N64RSP.acc.l.single, lo);
-    N64RSP.acc.l.single  = _mm_add_epi16(N64RSP.acc.l.single, lo);
-    omask              = _mm_cmpeq_epi16(N64RSP.acc.l.single, omask);
-    omask              = _mm_cmpeq_epi16(omask, N64RSP.zero);
-    hi                 = _mm_sub_epi16(hi, omask);
-    omask              = _mm_adds_epu16(N64RSP.acc.m.single, hi);
-    N64RSP.acc.m.single  = _mm_add_epi16(N64RSP.acc.m.single, hi);
-    omask              = _mm_cmpeq_epi16(N64RSP.acc.m.single, omask);
-    omask              = _mm_cmpeq_epi16(omask, N64RSP.zero);
-    hi                 = _mm_srai_epi16(hi, 15);
-    N64RSP.acc.h.single  = _mm_add_epi16(N64RSP.acc.h.single, hi);
-    N64RSP.acc.h.single  = _mm_sub_epi16(N64RSP.acc.h.single, omask);
-    nhi                = _mm_srai_epi16(N64RSP.acc.h.single, 15);
-    nmd                = _mm_srai_epi16(N64RSP.acc.m.single, 15);
-    shi                = _mm_cmpeq_epi16(nhi, N64RSP.acc.h.single);
-    smd                = _mm_cmpeq_epi16(nhi, nmd);
-    cmask              = _mm_and_si128(smd, shi);
-    cval               = _mm_cmpeq_epi16(nhi, N64RSP.zero);
-    vd->single         = _mm_blendv_epi8(cval, N64RSP.acc.l.single, cmask);
-#else
     for (int e = 0; e < 8; e++) {
         shalf multiplicand1 = vte.elements[e];
         half multiplicand2 = vs->elements[e];
@@ -1061,7 +935,6 @@ RSP_VECTOR_INSTR(rsp_vec_vmadn) {
 
         vd->elements[e] = result;
     }
-#endif
 }
 
 RSP_VECTOR_INSTR(rsp_vec_vmov) {
@@ -1091,15 +964,10 @@ RSP_VECTOR_INSTR(rsp_vec_vmov) {
     byte de = instruction.cp2_vec.vs & 7;
 
     half vte_elem = vte.elements[VU_ELEM_INDEX(se)];
-#ifdef N64_USE_SIMD
-    vd->elements[VU_ELEM_INDEX(de)] = vte_elem;
-    N64RSP.acc.l = vte;
-#else
     vd->elements[VU_ELEM_INDEX(de)] = vte_elem;
     for (int i = 0; i < 8; i++) {
         N64RSP.acc.l.elements[i] = vte.elements[i];
     }
-#endif
 }
 
 RSP_VECTOR_INSTR(rsp_vec_vmrg) {
@@ -1127,7 +995,7 @@ RSP_VECTOR_INSTR(rsp_vec_vmudh) {
         shalf multiplicand2 = vs->elements[e];
         sword prod = multiplicand1 * multiplicand2;
 
-        dword acc = (sdword)prod;
+        sdword acc = (sdword)prod;
 
         shalf result = clamp_signed(acc);
 
@@ -1335,13 +1203,9 @@ RSP_VECTOR_INSTR(rsp_vec_vrcp) {
     vd->elements[VU_ELEM_INDEX(de)] = result & 0xFFFF;
     N64RSP.divout = (result >> 16) & 0xFFFF;
     defvte;
-#ifdef N64_USE_SIMD
-    N64RSP.acc.l.single = vte.single;
-#else
     for (int i = 0; i < 8; i++) {
         N64RSP.acc.l.elements[i] = vte.elements[i];
     }
-#endif
 }
 
 RSP_VECTOR_INSTR(rsp_vec_vrcpl) {
@@ -1362,13 +1226,9 @@ RSP_VECTOR_INSTR(rsp_vec_vrcpl) {
     N64RSP.divin = 0;
     N64RSP.divin_loaded = false;
     defvte;
-#ifdef N64_USE_SIMD
-    N64RSP.acc.l.single = vte.single;
-#else
     for (int i = 0; i < 8; i++) {
         N64RSP.acc.l.elements[i] = vte.elements[i];
     }
-#endif
 }
 
 RSP_VECTOR_INSTR(rsp_vec_vrndn) {
@@ -1396,13 +1256,9 @@ RSP_VECTOR_INSTR(rsp_vec_vrsq) {
     vd->elements[VU_ELEM_INDEX(de)] = result & 0xFFFF;
     N64RSP.divout = (result >> 16) & 0xFFFF;
 
-#ifdef N64_USE_SIMD
-    N64RSP.acc.l.single = vte.single;
-#else
     for (int i = 0; i < 8; i++) {
         N64RSP.acc.l.elements[i] = vte.elements[i];
     }
-#endif
 }
 
 RSP_VECTOR_INSTR(rsp_vec_vrcph_vrsqh) {
@@ -1412,13 +1268,9 @@ RSP_VECTOR_INSTR(rsp_vec_vrcph_vrsqh) {
     defvte;
     byte de = instruction.cp2_vec.vs;
 
-#ifdef N64_USE_SIMD
-    N64RSP.acc.l.single = vte.single;
-#else
     for (int i = 0; i < 8; i++) {
         N64RSP.acc.l.elements[i] = vte.elements[i];
     }
-#endif
     N64RSP.divin_loaded = true;
     N64RSP.divin = vt->elements[VU_ELEM_INDEX(instruction.cp2_vec.e & 7)];
     vd->elements[VU_ELEM_INDEX(de & 7)] = N64RSP.divout;
@@ -1443,13 +1295,9 @@ RSP_VECTOR_INSTR(rsp_vec_vrsql) {
     N64RSP.divin = 0;
     N64RSP.divin_loaded = false;
 
-#ifdef N64_USE_SIMD
-    N64RSP.acc.l.single = vte.single;
-#else
     for (int i = 0; i < 8; i++) {
         N64RSP.acc.l.elements[i] = vte.elements[i];
     }
-#endif
 }
 
 RSP_VECTOR_INSTR(rsp_vec_vsar) {
@@ -1457,31 +1305,19 @@ RSP_VECTOR_INSTR(rsp_vec_vsar) {
     defvd;
     switch (instruction.cp2_vec.e) {
         case 0x8:
-#ifdef N64_USE_SIMD
-            vd->single = N64RSP.acc.h.single;
-#else
             for (int i = 0; i < 8; i++) {
                 vd->elements[i] = N64RSP.acc.h.elements[i];
             }
-#endif
             break;
         case 0x9:
-#ifdef N64_USE_SIMD
-            vd->single = N64RSP.acc.m.single;
-#else
             for (int i = 0; i < 8; i++) {
                 vd->elements[i] = N64RSP.acc.m.elements[i];
             }
-#endif
             break;
         case 0xA:
-#ifdef N64_USE_SIMD
-            vd->single = N64RSP.acc.l.single;
-#else
             for (int i = 0; i < 8; i++) {
                 vd->elements[i] = N64RSP.acc.l.elements[i];
             }
-#endif
             break;
         default: // Not actually sure what the default behavior is here
             for (int i = 0; i < 8; i++) {
