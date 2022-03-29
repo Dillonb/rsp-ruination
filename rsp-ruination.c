@@ -3,8 +3,16 @@
 #include <string.h>
 #include <stdint.h>
 
+// CMake passes -DNDEBUG to release builds - this would disable ISViewer logging in libdragon
+#ifdef NDEBUG
+#undef NDEBUG
+#define NDEBUG_
+#endif
 #include <libdragon.h>
 #include <rsp.h>
+#ifdef NDEBUG_
+#define NDEBUG
+#endif
 
 #include "rsp_vector_instructions.h"
 #include "rsp_funct.h"
@@ -96,7 +104,7 @@ void load_replacement_ucode(word instruction, int* replacement_indices, unsigned
     for (int i = 0; i < 16; i++) {
         uncached_ucode[replacement_indices[i]] = instruction == 0x00000000 ? instruction : element_instruction(instruction, i);
     }
-    load_ucode(uncached_ucode, ucode_size);
+    rsp_load_code(uncached_ucode, ucode_size, 0);
     for (int i = 0; i < 0x1000; i++) {
         N64RSP.sp_imem[i] = uncached_ucode[i];
     }
@@ -237,7 +245,7 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
     }
 
     for (int i = 0; i < 8; i++) {
-        next_testcase(&testcase.arg1.elements[i], &testcase.arg2.elements[i]);
+        next_testcase(&dmem_results->arg1.elements[i], &dmem_results->arg2.elements[i]);
     }
 
     for (int i = 0; i < 8; i++) {
@@ -245,9 +253,9 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
         N64RSP.vu_regs[vt].elements[i] = dmem_results->arg2.elements[i];
     }
 
-    load_data(dmem_results, sizeof(testcase_t));
+    rsp_load_data(dmem_results, sizeof(testcase_t), 0);
     rsp_execution_complete = false;
-    run_ucode();
+    rsp_run_async();
 
     for (int e = 0; e < 16; e++) {
         instruction.cp2_vec.e = e;
@@ -269,7 +277,7 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
         console_render();
     }
 
-    read_data(dmem_results, sizeof(testcase_t));
+    rsp_read_data(dmem_results, sizeof(testcase_t), 0);
 
 
     for (int e = 0; e < 16; e++) {
@@ -308,10 +316,10 @@ void run_test(rsp_testable_instruction_t* testable_instruction, mips_instruction
 }
 
 int main(void) {
+    debug_init(DEBUG_FEATURE_LOG_ISVIEWER);
+    debug_init_isviewer();
     dmem_results = UncachedAddr(malloc(sizeof(testcase_t)));
     testcase_emulated = UncachedAddr(malloc(sizeof(testcase_t)));
-    /* enable interrupts (on the CPU) */
-    init_interrupts();
 
     /* Initialize peripherals */
     display_init( res, bit, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE );
@@ -326,7 +334,7 @@ int main(void) {
     // Size must be multiple of 8 and start & end must be aligned to 8 bytes
     unsigned long data_size = (unsigned long) (&__basic_ucode_start - &__basic_ucode_data_start);
     unsigned long ucode_size = (unsigned long) (&__basic_ucode_end - &__basic_ucode_start);
-    load_data((void*)&__basic_ucode_data_start, data_size);
+    rsp_load_data((void*)&__basic_ucode_data_start, data_size, 0);
 
     int replacement_indices[16];
     int found = 0;
@@ -353,14 +361,14 @@ int main(void) {
     // Get initial state by "testing" with NOPs
     load_replacement_ucode(0x00000000, replacement_indices, ucode_size);
     memset(dmem_results, 0x00, sizeof(testcase_t));
-    load_data(dmem_results, sizeof(testcase_t));
+    rsp_load_data(dmem_results, sizeof(testcase_t), 0);
     rsp_execution_complete = false;
-    run_ucode();
+    rsp_run_async();
     while (!rsp_execution_complete) {
         printf("Grabbing initial state from RSP...\n");
         console_render();
     }
-    read_data(dmem_results, sizeof(testcase_t));
+    rsp_read_data(dmem_results, sizeof(testcase_t), 0);
     rsp_set_vcc(dmem_results->flag_elements[0].vcc);
     rsp_set_vce(dmem_results->flag_elements[0].vce);
     rsp_set_vco(dmem_results->flag_elements[0].vco);

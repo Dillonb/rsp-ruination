@@ -1,4 +1,4 @@
-#include <ucode.S>
+#include <rsp.inc>
 
 .macro cfc2 reg, flagreg
     .long (0b010010 << 26 | 0b00010 << 21 | \reg << 16 | \flagreg << 11)
@@ -6,7 +6,7 @@
 
 .text
 
-lqv $v00, 0, 0, $zero
+lqv $v00, 0, 0, zero
 
 // Load first argument
 la $2, arg1
@@ -73,11 +73,11 @@ saveResults:
     // VCE
     cfc2 9, 2
     sh $9, 0($8)
-    jr $ra
+    jr ra
     nop
 
 .data
-zero:  .word 0,0,0,0
+zerodata:  .word 0,0,0,0
 arg1:  .word 0,0,0,0
 arg2:  .word 0,0,0,0
 
