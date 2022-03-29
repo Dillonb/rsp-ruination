@@ -223,7 +223,7 @@ void testcases_reset() {
 
 void next_testcase(volatile half* a1, volatile half* a2) {
     *a1 = testcase_numbers[arg1_index];
-    *a1 = testcase_numbers[arg2_index];
+    *a2 = testcase_numbers[arg2_index];
 
     if (++arg1_index == NUM_TESTCASE_NUMBERS) {
         arg1_index = 0;
