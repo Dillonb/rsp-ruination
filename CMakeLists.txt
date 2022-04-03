@@ -14,12 +14,10 @@ set(CHKSUM64 ${tools}/bin/chksum64)
 
 set(LINKER_SCRIPT n64.ld)
 include_directories(${tools}/mips64-elf/include .)
-add_compile_options(-std=gnu99 -march=vr4300 -mtune=vr4300)
+add_compile_options(-std=gnu99 -march=vr4300 -mtune=vr4300 -DN64_BIG_ENDIAN)
 set(LIBS_DIR ${tools}/mips64-elf/lib)
 
 set(CMAKE_C_LINK_EXECUTABLE   "${CMAKE_C_LINKER} -o <TARGET> <OBJECTS> <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> -L${LIBS_DIR} <LINK_LIBRARIES> -T${LINKER_SCRIPT}")
-
-ADD_COMPILE_DEFINITIONS(N64_BIG_ENDIAN)
 
 # Build RSP microcode
 add_custom_command(OUTPUT text.section.bin data.section.bin
