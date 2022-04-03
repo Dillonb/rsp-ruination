@@ -12,10 +12,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@master
 
-      - name: Install dependencies
+      - name: Install build tools
         run: |
           apt-get update
-          apt-get install -y cmake
+          apt-get install -y cmake wget
+
+      - name: Install chksum64
+        run: |
+          mkdir -p tmp
+          cd tmp
+          wget https://raw.githubusercontent.com/DragonMinded/libdragon/trunk/tools/chksum64.c
+          gcc chksum64.c -o chksum64
+          mv chksum64 $N64_INST/bin/
+
+      - name: Install n64tool
+        run: |
+          mkdir -p tmp
+          cd tmp
+          wget https://raw.githubusercontent.com/DragonMinded/libdragon/trunk/tools/n64tool.c
+          gcc n64tool.c -o n64tool
+          mv n64tool $N64_INST/bin/
 
       - name: Build
         run: |
