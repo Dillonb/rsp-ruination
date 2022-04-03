@@ -1,0 +1,33 @@
+name: Build
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    container:
+      image: ghcr.io/dragonminded/libdragon
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+        with:
+          submodules: true
+
+      - name: Build
+        run: |
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make
+
+      - name: Collect files
+        run: |
+          mkdir upload
+          mv build/rsp-ruination.z64 upload
+
+      - name: Upload files
+        uses: actions/upload-artifact@master
+        with:
+          name: rsp-ruination
+          path: upload
