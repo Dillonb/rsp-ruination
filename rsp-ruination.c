@@ -3,16 +3,8 @@
 #include <string.h>
 #include <stdint.h>
 
-// CMake passes -DNDEBUG to release builds - this would disable ISViewer logging in libdragon
-#ifdef NDEBUG
-#undef NDEBUG
-#define NDEBUG_
-#endif
 #include <libdragon.h>
 #include <rsp.h>
-#ifdef NDEBUG_
-#define NDEBUG
-#endif
 
 #include "rsp_vector_instructions.h"
 #include "rsp_funct.h"
@@ -20,9 +12,7 @@
 #include "mips_instruction_decode.h"
 #include "testcases.h"
 
-extern const void __basic_ucode_data_start;
-extern const void __basic_ucode_start;
-extern const void __basic_ucode_end;
+DEFINE_RSP_UCODE(rsp_test_ucode);
 
 static resolution_t res = RESOLUTION_320x240;
 static bitdepth_t bit = DEPTH_32_BPP;
@@ -100,7 +90,7 @@ word element_instruction(word instruction, int element) {
 void load_replacement_ucode(word instruction, int* replacement_indices, unsigned long ucode_size) {
     word* ucode = malloc(ucode_size);
     word* uncached_ucode = UncachedAddr(ucode);
-    memcpy(uncached_ucode, &__basic_ucode_start, ucode_size);
+    memcpy(uncached_ucode, rsp_test_ucode.code, ucode_size);
     for (int i = 0; i < 16; i++) {
         uncached_ucode[replacement_indices[i]] = instruction == 0x00000000 ? instruction : element_instruction(instruction, i);
     }
@@ -332,13 +322,13 @@ int main(void) {
     set_SP_interrupt(1);
 
     // Size must be multiple of 8 and start & end must be aligned to 8 bytes
-    unsigned long data_size = (unsigned long) (&__basic_ucode_start - &__basic_ucode_data_start);
-    unsigned long ucode_size = (unsigned long) (&__basic_ucode_end - &__basic_ucode_start);
-    rsp_load_data((void*)&__basic_ucode_data_start, data_size, 0);
+    unsigned long data_size = (unsigned long) ((uint8_t*)rsp_test_ucode.data_end - rsp_test_ucode.data);
+    unsigned long ucode_size = (unsigned long) ((uint8_t*)rsp_test_ucode.code_end - rsp_test_ucode.code);
+    rsp_load_data(rsp_test_ucode.data, data_size, 0);
 
     int replacement_indices[16];
     int found = 0;
-    word* ucodeptr = (word*)&__basic_ucode_start;
+    word* ucodeptr = (word*)rsp_test_ucode.code;
     for (int i = 0; i < (ucode_size / 4); i++) {
         if (ucodeptr[i] == 0xFFFFFFFF) {
             replacement_indices[found++] = i;

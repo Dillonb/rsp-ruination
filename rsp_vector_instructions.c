@@ -1,7 +1,7 @@
 #include "rsp_vector_instructions.h"
 
 
-#include <log.h>
+#include "log.h"
 #include <stdlib.h>
 #include "rsp.h"
 #include "rsp_rom.h"

@@ -1,8 +1,8 @@
 #ifndef N64_N64_RSP_BUS_H
 #define N64_N64_RSP_BUS_H
 
-#include <util.h>
-#include <rsp_types.h>
+#include "util.h"
+#include "rsp_types.h"
 
 #include "rsp.h"
 #include "rsp_state.h"
