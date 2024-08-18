@@ -10,7 +10,6 @@
   outputs = { self, nixpkgs, flake-utils, n64-tools }: flake-utils.lib.eachDefaultSystem (system:
     let
       shortRev = with self; if sourceInfo?dirtyShortRev then sourceInfo.dirtyShortRev else sourceInfo.shortRev;
-      rev = with self; if sourceInfo?dirtyRev then sourceInfo.dirtyRev else sourceInfo.rev;
       pkgs = import nixpkgs { inherit system; };
       n64_inst = (n64-tools.packages.${system}.mkLibDragon {
         rev = "f3aae88520fd9427c969961b556d1bccdb5c89de";
@@ -18,6 +17,15 @@
       }).n64_inst;
     in
     {
+        packages.default = pkgs.stdenv.mkDerivation
+        {
+          pname = "rsp-ruination";
+          version = shortRev;
+          src = ./.;
+          N64_INST = n64_inst;
+          installPhase = "install -Dm644 rsp-ruination.z64 $out/rsp-ruination.z64";
+        };
+
         devShells.default = pkgs.mkShell
         {
           N64_INST = n64_inst;
