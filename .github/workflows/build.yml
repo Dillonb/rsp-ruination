@@ -17,3 +17,12 @@ jobs:
       - uses: DeterminateSystems/flake-checker-action@main
       - name: Run `nix build`
         run: nix build .
+      - name: Collect files
+        run: |
+          mkdir upload
+          cp ./result/rsp-ruination.z64 upload
+      - name: Upload files
+        uses: actions/upload-artifact@master
+        with:
+          name: rsp-ruination
+          path: upload
