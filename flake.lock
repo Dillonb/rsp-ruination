@@ -42,11 +42,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1724010839,
-        "narHash": "sha256-xRaeIQbcGjfW4/XqEjupiYPsBocEkyFGQVNEm7QjDNU=",
+        "lastModified": 1724023824,
+        "narHash": "sha256-QzZ67OXiPHaVNbYkytLcnepgawTDw+cIS4XmCl644Mc=",
         "owner": "Dillonb",
         "repo": "n64-tools.nix",
-        "rev": "591246f20cd41131431d7de2a8dcc8bc47720849",
+        "rev": "de82298ce24476b5d1dd72dc95e17d57d7d83068",
         "type": "github"
       },
       "original": {
