@@ -20,10 +20,6 @@
     {
         devShells.default = pkgs.mkShell
         {
-          buildInputs = with pkgs; [
-            cmake
-            ninja
-          ];
           N64_INST = n64_inst;
         };
     }
