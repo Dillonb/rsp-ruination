@@ -101,8 +101,6 @@ void load_replacement_ucode(word instruction, int* replacement_indices, unsigned
     free(ucode);
 }
 
-typedef void(*rspinstr_handler_t)(mips_instruction_t);
-
 typedef struct rsp_testable_instruction {
     rspinstr_handler_t handler;
     int funct;
