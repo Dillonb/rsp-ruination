@@ -1,0 +1,7 @@
+CompileFlags:
+  Remove:
+    - "-march=vr4300"
+    - "-mtune=vr4300"
+  Add:
+    - "-march=mips3"
+    - "-mtune=mips3"

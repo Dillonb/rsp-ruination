@@ -8,3 +8,5 @@ cmake-build-release
 build
 .direnv
 result
+.cache
+compile_commands.json

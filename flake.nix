@@ -28,6 +28,7 @@
 
         devShells.default = pkgs.mkShell
         {
+          buildInputs = with pkgs; [ clang-tools ];
           N64_INST = n64_inst;
         };
     }
